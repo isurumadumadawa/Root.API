@@ -1,0 +1,453 @@
+openapi: 3.0.3
+info:
+  title: User Role Management API Contract
+  version: 1.0.0
+  description: Contract for authentication, role lookup, and role-based user management.
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+paths:
+  /auth/sign-in:
+    post:
+      summary: Sign in with username and password
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+      responses:
+        '200':
+          description: Sign-in successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignInResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid credentials or deleted user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/role:
+    get:
+      summary: Resolve role from bearer token
+      tags: [Authentication]
+      responses:
+        '200':
+          description: Role resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users:
+    get:
+      summary: Get all users (admin, agent)
+      tags: [Users]
+      responses:
+        '200':
+          description: User list returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserSummary'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Role not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create user (admin only)
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Role not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Username conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}:
+    get:
+      summary: Get user detail (admin/agent any user, user self only)
+      tags: [Users]
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User detail returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Role not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update user (admin any fields allowed by policy; user self only name and position)
+      tags: [Users]
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Role not allowed or immutable field attempted by user role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/me:
+    get:
+      summary: Get own profile (any authenticated user)
+      tags: [Users]
+      responses:
+        '200':
+          description: Own profile returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update own name and position (user role only — username/role/createdDate immutable per FR-029)
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelfUpdateUserRequest'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Caller is not user role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/{userId}/delete:
+    post:
+      summary: Soft-delete user (admin only)
+      tags: [Users]
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User soft-deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteUserResponse'
+        '401':
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Role not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    SignInRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 120
+        password:
+          type: string
+          minLength: 1
+
+    SignInResponse:
+      type: object
+      required: [token, tokenType, issuedAtUtc, role]
+      properties:
+        token:
+          type: string
+        tokenType:
+          type: string
+          example: Bearer
+        issuedAtUtc:
+          type: string
+          format: date-time
+        expiresAtUtc:
+          type: string
+          format: date-time
+          nullable: true
+          description: Null by design because automatic token expiry is disabled.
+        role:
+          type: string
+          enum: [user, admin, agent]
+
+    RoleResponse:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [user, admin, agent]
+
+    CreateUserRequest:
+      type: object
+      required: [name, username, password, role]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        username:
+          type: string
+          minLength: 1
+          maxLength: 120
+        password:
+          type: string
+          minLength: 8
+        position:
+          type: string
+          maxLength: 120
+          nullable: true
+        role:
+          type: string
+          enum: [user, admin, agent]
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        position:
+          type: string
+          maxLength: 120
+          nullable: true
+        role:
+          type: string
+          enum: [user, admin, agent]
+          description: Only admin may update role.
+
+    UserSummary:
+      type: object
+      required: [id, name, username, role, createdDate, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        username:
+          type: string
+        position:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [user, admin, agent]
+        createdDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [Active, Deleted]
+
+    UserDetail:
+      allOf:
+        - $ref: '#/components/schemas/UserSummary'
+
+    DeleteUserResponse:
+      type: object
+      required: [userId, status]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [Deleted]
+
+    ErrorResponse:
+      type: object
+      required: [code, message, traceId]
+      properties:
+        code:
+          type: string
+          example: validation_error
+        message:
+          type: string
+        traceId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    SelfUpdateUserRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        position:
+          type: string
+          maxLength: 120
+          nullable: true
